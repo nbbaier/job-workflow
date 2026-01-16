@@ -112,12 +112,12 @@ MVP guarantees `metadata.json`, `job_posting.json`, `resume_customized.json`, `r
 
 ### Resume Output Formats
 
-- JSON Resume (source of truth)
-- LaTeX (for custom styling)
-- PDF - ATS-friendly (simple formatting for automated screening)
-- PDF - Pretty (styled version for human readers)
-MVP outputs JSON Resume plus a minimal LaTeX template and ATS-friendly PDF via `tectonic` using `templates/resume_ats.tex` and `templates/resume_shared.sty`; the only required output is `resume_ats.pdf`.
-MVP ships with the minimal template set; if `tectonic` is unavailable, LaTeX/PDF outputs are skipped with a clear notice.
+-  JSON Resume (source of truth)
+-  LaTeX (for custom styling)
+-  PDF - ATS-friendly (simple formatting for automated screening)
+-  PDF - Pretty (styled version for human readers)
+   MVP outputs JSON Resume plus a minimal LaTeX template and ATS-friendly PDF via `tectonic` using `templates/resume_ats.tex` and `templates/resume_shared.sty`; the only required output is `resume_ats.pdf`.
+   MVP ships with the minimal template set; if `tectonic` is unavailable, LaTeX/PDF outputs are skipped with a clear notice.
 
 ## Core Features
 
@@ -168,27 +168,27 @@ Activated on demand:
 
 ### Must Have
 
-- [ ] API layer (Mastra workflow endpoint)
-- [ ] Parse Agent: URL fetch with paste fallback
-- [ ] Write Agent: Basic resume customization (JSON Resume output + inline diff)
-- [ ] CLI: `job-flow <url>` command
-- [ ] Web form: Simple paste interface
-- [ ] Minimal LaTeX/PDF rendering (ATS-friendly template + renderer)
-- [ ] Job folder output with core artifacts (metadata, parsed job, customized resume, LaTeX, ATS PDF, diff)
-- [ ] Simple auth (API key protection)
+-  [ ] API layer (Mastra workflow endpoint)
+-  [ ] Parse Agent: URL fetch with paste fallback
+-  [ ] Write Agent: Basic resume customization (JSON Resume output + inline diff)
+-  [ ] CLI: `job-flow <url>` command
+-  [ ] Web form: Simple paste interface
+-  [ ] Minimal LaTeX/PDF rendering (ATS-friendly template + renderer)
+-  [ ] Job folder output with core artifacts (metadata, parsed job, customized resume, LaTeX, ATS PDF, diff)
+-  [ ] Simple auth (API key protection)
 
 ### Defer to Later
 
-- [ ] Analyze Agent (fit scoring)
-- [ ] Review Agent
-- [ ] Cover letter generation
-- [ ] Company research features
-- [ ] Contact/networking features
-- [ ] Memory layer (learning from edits)
-- [ ] Full web UI beyond basic form
-- [ ] Email notifications
-- [ ] Offline editing with sync
-- [ ] Job board API integrations
+-  [ ] Analyze Agent (fit scoring)
+-  [ ] Review Agent
+-  [ ] Cover letter generation
+-  [ ] Company research features
+-  [ ] Contact/networking features
+-  [ ] Memory layer (learning from edits)
+-  [ ] Full web UI beyond basic form
+-  [ ] Email notifications
+-  [ ] Offline editing with sync
+-  [ ] Job board API integrations
 
 ## Technical Stack
 
