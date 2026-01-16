@@ -1,0 +1,22 @@
+{
+  "name": "job-flow",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.0",
+    "hono": "^4.6.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241022.0",
+    "typescript": "^5.6.0",
+    "wrangler": "^3.84.0",
+    "@types/bun": "latest"
+  },
+  "module": "index.ts",
+  "type": "module"
+}

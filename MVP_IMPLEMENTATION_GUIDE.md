@@ -1,164 +1,258 @@
 # MVP Implementation Guide and Checklist
 
-This guide expands the MVP scope into an implementation plan with verifiable milestones. It assumes a standalone Mastra service deployed to Vercel using `@mastra/deployer-vercel`.
+This guide covers the minimal job application workflow: paste a job posting, get a customized resume back.
 
-## Constraints (Vercel + MVP)
+## Stack
 
--  Use a Node.js serverless runtime (not Edge) for Mastra execution and PDF rendering.
--  Target Node.js 22+ on Vercel (Mastra requires Node >= 22.13).
--  No persistent local filesystem on Vercel. Use external storage for artifacts and a hosted database.
--  Keep requests stateless; store run state and outputs in DB/blob storage.
--  Fit within typical serverless timeouts; avoid long-running synchronous work.
--  Prefer a Hono-based server (via `@mastra/server`) with custom routes over Next.js API routes.
+| Concern      | Solution                |
+| ------------ | ----------------------- |
+| Runtime      | Cloudflare Workers      |
+| Framework    | Hono                    |
+| LLM          | Anthropic Claude Sonnet |
+| Storage      | Cloudflare R2           |
+| Job Fetching | Jina Reader API         |
+| Auth         | Bearer token            |
 
-## Desired Stack
+No database. No orchestration framework. Single API endpoint.
 
-- `hono` for the server framework
-- `bun` for local dev tooling; production runtime is Node.js on Vercel (`@vercel/node`).
+## Constraints
 
-## Mastra Integration Notes (MVP)
-
--  `@mastra/core` provides the `Mastra` orchestration class; register agents, workflows, tools there.
--  `@mastra/server` exposes framework-agnostic handlers; the docs show mounting them in Hono and calling `handlers.agents.*` for list/generate.
--  Mastra's server layer ships framework-agnostic handlers; OpenAPI spec generation is available when `openapiPath` is configured. Expose only the endpoints you need for MVP.
--  `@mastra/libsql` provides `LibSQLStore`/`DefaultStorage` (LibSQL/SQLite) with `url` config and auto table init; `@mastra/core/storage` provides the base types. Use hosted LibSQL (Turso) on Vercel.
--  `@mastra/deployer-vercel` generates `vercel.json` and `index.mjs` for `@vercel/node`, and writes `maxDuration`, `memory`, `regions` to `.vercel/output/functions/index.func/.vc-config.json`.
--  The deployer is configured in your `Mastra` instance (`new VercelDeployer({ maxDuration, memory, regions })`).
+-  Stateless: all state lives in R2 or is passed in the request
+-  Workers have 30s CPU time limit (plenty for one LLM call)
+-  R2 is eventually consistent (fine for this use case)
+-  No local filesystem persistence
 
 ## Milestones
 
-### M0 - Repo and Config Baseline
+### M0 - Project Setup
 
-Checklist
+**Checklist**
 
--  [ ] Define env vars: `DATABASE_URL`, `JOB_STORAGE_MODE` (`local` or `blob`), `JOB_STORAGE_ROOT` (local path or blob prefix), `RESUME_SOURCE`, `RESUME_JSON_B64` (if using env source), `API_KEY`, plus blob credentials and LLM provider key(s).
--  [ ] Add runtime deps: `@mastra/core`, `@mastra/server`, `@mastra/deployer-vercel`, `@mastra/libsql`, and `hono`.
--  [ ] Create `mastra.mjs` (or equivalent) that instantiates `Mastra` with `VercelDeployer` and a Hono server.
--  [ ] Add a health endpoint (`/health`) on the Hono app.
--  [ ] Document local dev and Vercel env setup in `README.md` or `ENV.md`.
+-  [ ] Initialize project with `npm init`
+-  [ ] Install dependencies: `hono`, `@anthropic-ai/sdk`
+-  [ ] Install dev dependencies: `wrangler`, `typescript`, `@cloudflare/workers-types`
+-  [ ] Create `wrangler.toml` with R2 bucket binding
+-  [ ] Create `tsconfig.json` for Workers environment
+-  [ ] Create R2 bucket: `wrangler r2 bucket create job-flow`
+-  [ ] Set secrets: `wrangler secret put ANTHROPIC_API_KEY`, `wrangler secret put API_TOKEN`
 
-Verify
+**Verify**
 
--  `curl http://localhost:3000/health` returns 200 with JSON `{ "ok": true }`.
+```bash
+npm run dev
+curl http://localhost:8787/ -H "Authorization: Bearer YOUR_TOKEN"
+# Returns: {"status":"ok","service":"job-flow"}
+```
 
-### M1 - Mastra Workflow Skeleton (Parse + Write)
+---
 
-Checklist
+### M1 - Resume Storage
 
--  [ ] Define workflow input schema: `{ source: "url" | "text", payload: string }`.
--  [ ] Implement URL fetch with timeout and content-length limits; on failure return a clear error so clients can resubmit pasted text.
--  [ ] Parse agent returns `job_posting.json` with required keys (title, company, requirements, responsibilities) and optional fields (salary, benefits, tech stack); use null/empty values when missing.
--  [ ] Write agent reads master resume JSON and produces `resume_customized.json`.
--  [ ] Enforce "no fabrication" rule in Write agent instructions.
+**Checklist**
 
-Verify
+-  [ ] Implement `PUT /resume` endpoint to upload JSON Resume to R2
+-  [ ] Implement `GET /resume` endpoint to retrieve current resume
+-  [ ] Validate JSON Resume has required `basics.name` field
+-  [ ] Create sample `resume.json` following JSON Resume schema
 
--  Local workflow invocation with a sample job text returns a run result and exposes a run id (e.g., `run.runId` or `startAsync`).
--  Stored `job_posting.json` and `resume_customized.json` match the schema.
+**Verify**
 
-### M2 - Resume Source Loader (Vercel-Compatible)
+```bash
+# Upload resume
+curl -X PUT http://localhost:8787/resume \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d @sample-resume.json
 
-Checklist
+# Retrieve resume
+curl http://localhost:8787/resume \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
 
--  [ ] Implement a loader chain: `RESUME_SOURCE=path|blob|env`.
--  [ ] `path` loads a local file (CLI/local dev).
--  [ ] `blob` loads from object storage (Vercel Blob or S3).
--  [ ] `env` loads from a base64 env var for small resumes.
--  [ ] Document the env var name (e.g., `RESUME_JSON_B64`) and enforce size limits based on the platform's env var caps.
--  [ ] Cache in memory per process (best-effort); do not rely on it across requests or write to local disk on Vercel.
+---
 
-Verify
+### M2 - Job Text Fetching
 
--  Switching `RESUME_SOURCE` changes the data source without code changes.
--  Resume content is identical across loaders for the same input.
+**Checklist**
 
-### M3 - Storage Adapter + Job Folder Layout
+-  [ ] Implement `getJobText()` helper function
+-  [ ] Detect URL vs raw text input
+-  [ ] For URLs, fetch via Jina Reader (`https://r.jina.ai/{url}`)
+-  [ ] Handle fetch failures gracefully (fall back to treating input as raw text)
+-  [ ] Log fetch failures for debugging
 
-Checklist
+**Verify**
 
--  [ ] Implement storage adapter with `local` and `blob` modes.
--  [ ] Generate job folder name using `<slug>_<date>_<hash>` (YYYY-MM-DD), where `<slug>` is a slugified `{company}_{title}`.
--  [ ] Write `metadata.json`, `job_posting.json`, `resume_customized.json`, `diff.html` (plus `resume_customized.tex` and `resume_ats.pdf` once rendered).
--  [ ] Store a manifest of artifact paths/URLs.
+```bash
+# Test with a real job URL (should return markdown)
+curl "https://r.jina.ai/https://boards.greenhouse.io/anthropic/jobs/4020515008"
+```
 
-Verify
+---
 
--  Local mode writes files under `jobs/<slug>_<date>_<hash>/`.
--  Blob mode lists the same artifact names with accessible URLs.
+### M3 - Core Customization Endpoint
 
-### M4 - Inline Diff Generation
+**Checklist**
 
-Checklist
+-  [ ] Implement `POST /customize` endpoint
+-  [ ] Accept `{ input: string }` body (URL or pasted text)
+-  [ ] Fetch job text using M2 helper
+-  [ ] Load resume from R2
+-  [ ] Build prompt with job text + resume
+-  [ ] Call Claude Sonnet with system prompt
+-  [ ] Parse JSON response from Claude
+-  [ ] Return structured response: `{ job, original, customized, changes, reasoning }`
 
--  [ ] Generate a diff between master resume and customized resume.
--  [ ] Render diff as HTML (`diff.html`) with minimal styling.
+**Verify**
 
-Verify
+```bash
+curl -X POST http://localhost:8787/customize \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"input": "Software Engineer at Acme Corp\n\nRequirements:\n- 3+ years TypeScript\n- React experience"}'
+```
 
--  `diff.html` highlights added/removed content for a sample job.
+Response should include:
 
-### M5 - Minimal LaTeX/PDF Rendering (MVP)
+-  Parsed job details (title, company, requirements)
+-  Original resume
+-  Customized resume with modifications
+-  List of changes with rationale
+-  Overall reasoning
 
-Checklist
+---
 
--  [ ] Add `templates/resume_ats.tex` and `templates/resume_shared.sty`.
--  [ ] Render `resume_customized.tex` from `resume_customized.json` using the templates.
--  [ ] Implement a renderer using `tectonic` to produce `resume_ats.pdf` from `resume_customized.tex`.
--  [ ] Ensure rendering is optional if `tectonic` is unavailable (clear notice).
--  [ ] Decide how `tectonic` runs on Vercel (vendored binary or external service).
+### M4 - Prompt Engineering
 
-Verify
+**Checklist**
 
--  Local: `resume_customized.tex` and `resume_ats.pdf` are generated for a sample job.
--  Vercel: rendering path either produces `resume_ats.pdf` or returns a clear "renderer unavailable" status.
+-  [ ] Write system prompt with clear instructions for Claude
+-  [ ] Define output JSON schema in prompt
+-  [ ] Include rules: no fabrication, preserve voice, ATS-friendly
+-  [ ] Build user prompt combining job text + resume
+-  [ ] Handle JSON parsing with fallback for markdown fences
+-  [ ] Test with variety of job posting formats
 
-### M6 - API Endpoint (Standalone Mastra Server)
+**Verify**
 
-Checklist
+-  Run against 3-5 different job postings
+-  Verify `changes` array accurately reflects differences
+-  Verify no hallucinated experience in customized resume
+-  Verify keywords from job posting appear naturally in output
 
--  [ ] Implement `POST /api/job` as a Hono route with API key auth (header `x-api-key`).
--  [ ] Ensure the handler uses Node runtime and only uses `/tmp` for ephemeral files; persist artifacts to blob storage.
--  [ ] If exposing Mastra endpoints, mount `@mastra/server` handlers under `/mastra` (Hono example in docs).
--  [ ] Return a response with run id and artifact locations.
+---
 
-Verify
+### M5 - Auth & Error Handling
 
--  Unauthorized request returns 401.
--  Authorized request returns 200 and a valid run id plus artifact URLs.
+**Checklist**
 
-### M7 - CLI Client
+-  [ ] Add bearer token auth middleware
+-  [ ] Return 401 for missing/invalid token
+-  [ ] Return 400 for malformed requests
+-  [ ] Return 500 with details for LLM/parsing failures
+-  [ ] Include raw LLM response in error for debugging
+-  [ ] Add CORS headers for web form access
 
-Checklist
+**Verify**
 
--  [ ] Add `job-flow <url>` and `job-flow` interactive mode.
--  [ ] CLI calls the API endpoint with retries and clear errors.
--  [ ] CLI prints the run id and artifact locations.
+```bash
+# No auth - should 401
+curl http://localhost:8787/resume
+# Returns: 401 Unauthorized
 
-Verify
+# Bad JSON - should 400
+curl -X POST http://localhost:8787/customize \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d "not json"
+# Returns: 400 with error message
+```
 
--  CLI works end-to-end against local dev server and Vercel preview URL.
+---
 
-### M8 - Vercel Deployment Milestone
+### M6 - Deploy to Cloudflare
 
-Checklist
+**Checklist**
 
--  [ ] Configure environment variables in Vercel.
--  [ ] Ensure DB connection is a hosted service (SQLite via libSQL/Turso or Vercel Postgres).
--  [ ] Confirm storage adapter uses blob mode in production.
--  [ ] Use `@mastra/deployer-vercel` and set `maxDuration`/`memory`/`regions` for PDF + LLM work.
--  [ ] Verify `vercel.json` and `index.mjs` are generated for `@vercel/node` (routes point to `index.mjs`).
--  [ ] Inspect `.vercel/output/functions/index.func/.vc-config.json` for the configured `maxDuration` and `memory`.
--  [ ] Deploy a preview and run a full job flow.
+-  [ ] Run `npm run deploy`
+-  [ ] Verify secrets are set in Cloudflare dashboard (or via `wrangler secret put`)
+-  [ ] Verify R2 bucket exists and is bound
+-  [ ] Test all endpoints against production URL
+-  [ ] Upload production resume to R2
 
-Verify
+**Verify**
 
--  Preview deployment processes a job and stores artifacts in blob storage.
--  Re-running the same input returns a conflict unless an explicit overwrite flag is provided.
+```bash
+# Test production
+curl https://job-flow.YOUR_SUBDOMAIN.workers.dev/ \
+  -H "Authorization: Bearer YOUR_TOKEN"
 
-### M9 - MVP Definition of Done
+curl -X POST https://job-flow.YOUR_SUBDOMAIN.workers.dev/customize \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"input": "https://some-job-posting-url.com"}'
+```
 
-Checklist
+---
 
--  [ ] All M0-M8 verification steps pass.
--  [ ] Outputs match the MVP artifact guarantee in `SPEC.md`.
--  [ ] API and CLI usage documented with a copy-paste example.
+### M7 - MVP Complete
+
+**Definition of Done**
+
+-  [ ] `POST /customize` accepts URL or pasted text
+-  [ ] Returns parsed job, customized resume, changes, reasoning
+-  [ ] Master resume stored in R2, accessible via `GET /resume`
+-  [ ] Resume updateable via `PUT /resume`
+-  [ ] All endpoints protected by bearer token
+-  [ ] Deployed and working on Cloudflare Workers
+-  [ ] README documents setup and usage
+
+---
+
+## Post-MVP Enhancements
+
+These are explicitly deferred:
+
+| Feature                | Notes                                       |
+| ---------------------- | ------------------------------------------- |
+| Job output persistence | Save results to R2 under `jobs/{slug}/`     |
+| Diff HTML generation   | Render visual diff of resume changes        |
+| PDF generation         | Use external service or client-side tooling |
+| CLI tool               | Simple wrapper around the API               |
+| Web form UI            | Basic HTML form for non-technical users     |
+| Fit scoring            | Analyze agent to score job match            |
+| Cover letters          | Additional output from Write agent          |
+| SQLite/Turso           | Only if you need querying job history       |
+
+Add these incrementally as you feel the need, not upfront.
+
+## Troubleshooting
+
+### "Master resume not found in R2"
+
+Upload your resume first:
+
+```bash
+curl -X PUT https://job-flow.YOUR_SUBDOMAIN.workers.dev/resume \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d @your-resume.json
+```
+
+### Jina Reader returns empty/truncated content
+
+Some sites block Jina. Fall back to pasting the job text directly.
+
+### Claude returns malformed JSON
+
+Check the `raw` field in the error response. Common issues:
+
+-  Response too long (increase `max_tokens`)
+-  Model wrapped JSON in markdown fences (parser handles this)
+-  Model added commentary outside JSON (parser should strip this)
+
+### Workers timeout
+
+The 30s CPU limit should be plenty. If hitting it:
+
+-  Check if Jina fetch is hanging (add timeout)
+-  Check if Claude call is taking too long (model issue, retry)
