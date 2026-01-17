@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { bearerAuth } from "hono/bearer-auth";
 import { cors } from "hono/cors";
 import { buildUserPrompt, parseResponse, SYSTEM_PROMPT } from "./prompt";
@@ -29,11 +30,13 @@ app.get("/", (c) => {
 
 // Main customization endpoint
 app.post("/customize", async (c) => {
-	const body = await c.req.json<CustomizeRequest>();
-	const { input } = body;
+	const parsedBody = await parseJsonBody<CustomizeRequest>(c);
+	if (!parsedBody.ok) return parsedBody.response;
+
+	const { input } = parsedBody.value;
 
 	if (!input || typeof input !== "string") {
-		return c.json({ error: "Missing or invalid 'input' field" }, 400);
+		return jsonError(c, 400, "Missing or invalid 'input' field");
 	}
 
 	// 1. Fetch job text (URL or raw text)
@@ -42,31 +45,41 @@ app.post("/customize", async (c) => {
 	// 2. Load master resume from R2
 	const resume = await getResume(c.env.BUCKET);
 	if (!resume) {
-		return c.json(
-			{ error: "Master resume not found in R2. Upload resume.json first." },
+		return jsonError(
+			c,
 			500,
+			"Master resume not found in R2. Upload resume.json first.",
 		);
 	}
 
 	// 3. Call Claude to customize
 	const anthropic = new Anthropic({ apiKey: c.env.ANTHROPIC_API_KEY });
 
-	const message = await anthropic.messages.create({
-		model: "claude-sonnet-4-20250514",
-		max_tokens: 8192,
-		messages: [
-			{
-				role: "user",
-				content: buildUserPrompt(jobText, resume),
-			},
-		],
-		system: SYSTEM_PROMPT,
-	});
+	let message: Anthropic.Message;
+	try {
+		message = await anthropic.messages.create({
+			model: "claude-sonnet-4-20250514",
+			max_tokens: 8192,
+			messages: [
+				{
+					role: "user",
+					content: buildUserPrompt(jobText, resume),
+				},
+			],
+			system: SYSTEM_PROMPT,
+		});
+	} catch (e) {
+		return jsonError(c, 500, "Claude request failed", {
+			details: e instanceof Error ? e.message : String(e),
+		});
+	}
 
 	// Extract text content from response
 	const textBlock = message.content.find((block) => block.type === "text");
 	if (!textBlock || textBlock.type !== "text") {
-		return c.json({ error: "No text response from Claude" }, 500);
+		return jsonError(c, 500, "No text response from Claude", {
+			raw: message.content,
+		});
 	}
 
 	// 4. Parse the response
@@ -74,14 +87,10 @@ app.post("/customize", async (c) => {
 	try {
 		parsed = parseResponse(textBlock.text);
 	} catch (e) {
-		return c.json(
-			{
-				error: "Failed to parse Claude response",
-				details: e instanceof Error ? e.message : String(e),
-				raw: textBlock.text,
-			},
-			500,
-		);
+		return jsonError(c, 500, "Failed to parse Claude response", {
+			details: e instanceof Error ? e.message : String(e),
+			raw: textBlock.text,
+		});
 	}
 
 	// 5. Build response
@@ -98,11 +107,14 @@ app.post("/customize", async (c) => {
 
 // Upload/update master resume
 app.put("/resume", async (c) => {
-	const resume = await c.req.json<JSONResume>();
+	const parsedBody = await parseJsonBody<JSONResume>(c);
+	if (!parsedBody.ok) return parsedBody.response;
+
+	const resume = parsedBody.value;
 
 	// Basic validation
 	if (!resume.basics?.name) {
-		return c.json({ error: "Invalid JSON Resume: missing basics.name" }, 400);
+		return jsonError(c, 400, "Invalid JSON Resume: missing basics.name");
 	}
 
 	await c.env.BUCKET.put("resume.json", JSON.stringify(resume, null, 2), {
@@ -116,7 +128,7 @@ app.put("/resume", async (c) => {
 app.get("/resume", async (c) => {
 	const resume = await getResume(c.env.BUCKET);
 	if (!resume) {
-		return c.json({ error: "No resume found" }, 404);
+		return jsonError(c, 404, "No resume found");
 	}
 	return c.json(resume);
 });
@@ -167,6 +179,42 @@ async function getResume(bucket: R2Bucket): Promise<JSONResume | null> {
 
 	const text = await object.text();
 	return JSON.parse(text) as JSONResume;
+}
+
+type JsonParseResult<T> =
+	| { ok: true; value: T }
+	| { ok: false; response: Response };
+
+function jsonError(
+	c: Context,
+	status: number,
+	error: string,
+	options?: { details?: string; raw?: unknown },
+): Response {
+	const body: {
+		error: string;
+		details?: string;
+		raw?: unknown;
+	} = { error };
+
+	if (options?.details) body.details = options.details;
+	if (options?.raw !== undefined) body.raw = options.raw;
+
+	return c.json(body, status);
+}
+
+async function parseJsonBody<T>(c: Context): Promise<JsonParseResult<T>> {
+	try {
+		const value = await c.req.json<T>();
+		return { ok: true, value };
+	} catch (e) {
+		return {
+			ok: false,
+			response: jsonError(c, 400, "Invalid JSON body", {
+				details: e instanceof Error ? e.message : String(e),
+			}),
+		};
+	}
 }
 
 export default app;
