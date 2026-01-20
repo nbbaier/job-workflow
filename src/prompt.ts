@@ -54,10 +54,7 @@ Respond with a JSON object matching this exact structure:
 
 Only output valid JSON. No markdown code fences, no commentary outside the JSON.`;
 
-export function buildUserPrompt(
-  jobText: string,
-  resume: JSONResume
-): string {
+export function buildUserPrompt(jobText: string, resume: JSONResume): string {
   return `## Job Posting
 
 ${jobText}
@@ -81,7 +78,7 @@ export function parseResponse(text: string): LLMResponse {
   // Try to extract JSON from the response
   // Sometimes the model wraps it in markdown code fences despite instructions
   let jsonStr = text.trim();
-  
+
   // Remove markdown code fences if present
   if (jsonStr.startsWith("```json")) {
     jsonStr = jsonStr.slice(7);
@@ -91,9 +88,9 @@ export function parseResponse(text: string): LLMResponse {
   if (jsonStr.endsWith("```")) {
     jsonStr = jsonStr.slice(0, -3);
   }
-  
+
   jsonStr = jsonStr.trim();
-  
+
   try {
     return JSON.parse(jsonStr) as LLMResponse;
   } catch (e) {
