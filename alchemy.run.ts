@@ -1,18 +1,18 @@
 import alchemy from "alchemy";
 import { R2Bucket, Worker } from "alchemy/cloudflare";
+import { CloudflareStateStore } from "alchemy/state";
 
-const app = await alchemy("job-flow", {
+const app = await alchemy("job-flow-app", {
   stage: process.env.STAGE ?? "production",
   password: process.env.ALCHEMY_PASSWORD,
+  stateStore: (scope) => new CloudflareStateStore(scope),
 });
 
-// Adopt the existing R2 bucket
-const bucket = await R2Bucket("job-flow", {
-  name: "job-flow",
+const bucket = await R2Bucket("job-flow-storage", {
+  name: "job-flow-storage",
   adopt: true,
 });
 
-// Deploy the Hono worker
 export const worker = await Worker("job-flow", {
   name: "job-flow",
   entrypoint: "./src/index.ts",
@@ -24,5 +24,7 @@ export const worker = await Worker("job-flow", {
     API_TOKEN: alchemy.secret(process.env.API_TOKEN),
   },
 });
+
+console.log("Worker URL:", worker.url);
 
 await app.finalize();
