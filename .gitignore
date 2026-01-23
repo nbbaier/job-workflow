@@ -57,3 +57,4 @@ _.seed
 archived/
 .wrangler/
 .alchemy/
+node_modules/
