@@ -3,12 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "tail": "wrangler tail"
+    "dev": "alchemy dev --env-file .env.local",
+    "deploy": "alchemy deploy",
+    "destroy": "alchemy destroy"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
+    "alchemy": "^0.83.1",
     "hono": "^4.11.4"
   },
   "devDependencies": {
