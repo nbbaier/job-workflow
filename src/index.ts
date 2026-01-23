@@ -18,10 +18,12 @@ const app = new Hono<{ Bindings: Env }>();
 // CORS for web form access
 app.use("*", cors());
 
-// Auth middleware - all routes require bearer token
-app.use("*", async (c, next) => {
-  const auth = bearerAuth({ token: c.env.API_TOKEN });
-  await auth(c, next);
+// Auth middleware - all routes require bearer token (skip OPTIONS for CORS preflight)
+app.use("*", (c, next) => {
+  if (c.req.method === "OPTIONS") {
+    return next();
+  }
+  return bearerAuth({ token: c.env.API_TOKEN })(c, next);
 });
 
 // Health check
@@ -42,18 +44,31 @@ app.post("/customize", async (c) => {
     return jsonError(c, 400, "Missing or invalid 'input' field");
   }
 
+  const trimmedInput = input.trim();
+  if (!trimmedInput) {
+    return jsonError(c, 400, "Input cannot be empty");
+  }
+
+  if (trimmedInput.length > 50_000) {
+    return jsonError(c, 413, "Input too large");
+  }
+
   // 1. Fetch job text (URL or raw text)
-  const jobText = await getJobText(input);
+  const jobText = await getJobText(trimmedInput);
 
   // 2. Load master resume from R2
-  const resume = await getResume(c.env.BUCKET);
-  if (!resume) {
+  const resumeResult = await getResume(c.env.BUCKET);
+  if (!resumeResult.ok) {
+    if (resumeResult.reason === "corrupt") {
+      return jsonError(c, 500, "Stored resume.json is corrupted");
+    }
     return jsonError(
       c,
       500,
       "Master resume not found in R2. Upload resume.json first."
     );
   }
+  const resume = resumeResult.resume;
 
   // 3. Call Claude to customize
   const anthropic = new Anthropic({ apiKey: c.env.ANTHROPIC_API_KEY });
@@ -122,20 +137,29 @@ app.put("/resume", async (c) => {
     return jsonError(c, 400, "Invalid JSON Resume: missing basics.name");
   }
 
-  await c.env.BUCKET.put("resume.json", JSON.stringify(resume, null, 2), {
-    httpMetadata: { contentType: "application/json" },
-  });
+  try {
+    await c.env.BUCKET.put("resume.json", JSON.stringify(resume, null, 2), {
+      httpMetadata: { contentType: "application/json" },
+    });
+  } catch (e) {
+    return jsonError(c, 500, "Failed to write resume", {
+      details: e instanceof Error ? e.message : String(e),
+    });
+  }
 
   return c.json({ status: "ok", message: "Resume uploaded" });
 });
 
 // Get current master resume
 app.get("/resume", async (c) => {
-  const resume = await getResume(c.env.BUCKET);
-  if (!resume) {
+  const resumeResult = await getResume(c.env.BUCKET);
+  if (!resumeResult.ok) {
+    if (resumeResult.reason === "corrupt") {
+      return jsonError(c, 500, "Stored resume.json is corrupted");
+    }
     return jsonError(c, 404, "No resume found");
   }
-  return c.json(resume);
+  return c.json(resumeResult.resume);
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -178,14 +202,22 @@ async function getJobText(input: string): Promise<string> {
   return trimmed;
 }
 
-async function getResume(bucket: R2Bucket): Promise<JSONResume | null> {
+type ResumeResult =
+  | { ok: true; resume: JSONResume }
+  | { ok: false; reason: "missing" | "corrupt" };
+
+async function getResume(bucket: R2Bucket): Promise<ResumeResult> {
   const object = await bucket.get("resume.json");
   if (!object) {
-    return null;
+    return { ok: false, reason: "missing" };
   }
 
   const text = await object.text();
-  return JSON.parse(text) as JSONResume;
+  try {
+    return { ok: true, resume: JSON.parse(text) as JSONResume };
+  } catch {
+    return { ok: false, reason: "corrupt" };
+  }
 }
 
 type JsonParseResult<T> =
