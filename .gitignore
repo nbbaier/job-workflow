@@ -47,25 +47,11 @@ _.seed
 *.lcov
 *.tgz
 *.tsbuildinfo
-\*.lcov
-\*.pid.lock
-\*.tgz
-\*.tsbuildinfo
+
+# IntelliJ based IDEs
+.idea
+
+# Finder (MacOS) folder config
+.DS_Store
 archived/
-bower_components
-build/Release
-coverage
-dist
-jspm_packages/
-lerna-debug.log*
-lib-cov
-logs
-node_modules
-node_modules/
-npm-debug.log_
-out
-pids
-report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
-web_modules/
-yarn-debug.log*
-yarn-error.log*
+.wrangler/
