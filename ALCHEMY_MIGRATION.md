@@ -1,15 +1,6 @@
-# Migration Plan: wrangler.toml → alchemy.run.ts
+# Alchemy Deployment Plan
 
-This document outlines the steps to migrate the job-flow app from wrangler-based Cloudflare Workers to alchemy.run infrastructure-as-code.
-
-## Overview
-
-| Aspect | Before (wrangler) | After (alchemy) |
-|--------|-------------------|-----------------|
-| Config format | TOML | TypeScript |
-| Secrets | `wrangler secret put` | `alchemy.secret()` + env vars |
-| State | Managed by Cloudflare | Local `.alchemy/` directory |
-| Type safety | Limited | Full TypeScript inference |
+This document outlines the steps to deploy the job-flow app with `alchemy.run.ts` infrastructure-as-code.
 
 ---
 
@@ -30,27 +21,27 @@ import alchemy from "alchemy";
 import { Worker, R2Bucket } from "alchemy/cloudflare";
 
 const app = await alchemy("job-flow", {
-  stage: process.env.STAGE ?? "production",
-  password: process.env.ALCHEMY_PASSWORD,
+   stage: process.env.STAGE ?? "production",
+   password: process.env.ALCHEMY_PASSWORD,
 });
 
-// Adopt the existing R2 bucket
+// Use the R2 bucket for the master resume
 const bucket = await R2Bucket("job-flow", {
-  name: "job-flow",
-  adopt: true,
+   name: "job-flow",
+   adopt: true,
 });
 
 // Deploy the Hono worker
 export const worker = await Worker("job-flow", {
-  name: "job-flow",
-  entrypoint: "./src/index.ts",
-  url: true,
-  compatibilityDate: "2024-01-01",
-  bindings: {
-    BUCKET: bucket,
-    ANTHROPIC_API_KEY: alchemy.secret(process.env.ANTHROPIC_API_KEY!),
-    API_TOKEN: alchemy.secret(process.env.API_TOKEN!),
-  },
+   name: "job-flow",
+   entrypoint: "./src/index.ts",
+   url: true,
+   compatibilityDate: "2024-01-01",
+   bindings: {
+      BUCKET: bucket,
+      ANTHROPIC_API_KEY: alchemy.secret(process.env.ANTHROPIC_API_KEY!),
+      API_TOKEN: alchemy.secret(process.env.API_TOKEN!),
+   },
 });
 
 await app.finalize();
@@ -74,15 +65,15 @@ This gives you full type safety for all bindings.
 
 ## Step 4: Update `package.json` scripts
 
-Replace wrangler scripts with alchemy commands:
+Use alchemy commands for development and deployment:
 
 ```json
 {
-  "scripts": {
-    "dev": "alchemy dev --env-file .env.local",
-    "deploy": "alchemy deploy",
-    "destroy": "alchemy destroy"
-  }
+   "scripts": {
+      "dev": "alchemy dev --env-file .env.local",
+      "deploy": "alchemy deploy",
+      "destroy": "alchemy destroy"
+   }
 }
 ```
 
@@ -120,15 +111,7 @@ Note: `.alchemy/` state files are safe to commit (secrets are encrypted), but yo
 
 ---
 
-## Step 7: Delete wrangler files
-
-Remove these files after successful migration:
-
-- `wrangler.toml`
-
----
-
-## Step 8: First deployment
+## Step 7: First deployment
 
 ```bash
 # Set up environment
@@ -152,10 +135,9 @@ bun run deploy
 - [ ] Worker responds at workers.dev URL
 - [ ] R2 bucket binding works (test `/resume` endpoints)
 - [ ] Secrets work (test `/customize` endpoint)
-- [ ] `wrangler.toml` deleted
 
 ---
 
-## Rollback
+## Secrets guidance
 
-If issues occur, restore `wrangler.toml` and revert `package.json` scripts. The existing Cloudflare resources remain unchanged.
+Secrets are supplied via environment variables and injected in `alchemy.run.ts` using `alchemy.secret(...)`. Keep API tokens out of source control and prefer `.env.local` for development and CI secrets for deployments.

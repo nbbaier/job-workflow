@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 Instructions for AI coding agents working with this codebase.
 
@@ -22,7 +22,7 @@ src/
 ├── prompt.ts   # System prompt and user prompt builder for Claude
 └── types.ts    # TypeScript types (JSONResume, ParsedJob, API contracts)
 
-wrangler.toml   # Cloudflare Workers config with R2 binding
+alchemy.run.ts  # Alchemy infrastructure config for Cloudflare Workers + R2
 ```
 
 ## Core Flow
@@ -35,24 +35,25 @@ wrangler.toml   # Cloudflare Workers config with R2 binding
 
 ## Environment & Secrets
 
-Set via `wrangler secret put`:
+Set via environment variables (see `.env.local.example`):
 
+- `ALCHEMY_PASSWORD` - encrypts `.alchemy/` state
+- `CLOUDFLARE_API_TOKEN` - Cloudflare API token
+- `CLOUDFLARE_ACCOUNT_ID` - Cloudflare account ID
 - `ANTHROPIC_API_KEY` - Anthropic API key
-- `API_TOKEN` - Bearer token for authenticating requests to this worker
+- `API_TOKEN` - Bearer token for authenticating requests
 
-R2 bucket binding in `wrangler.toml`:
+R2 bucket binding is configured in `alchemy.run.ts`:
 
 - `BUCKET` - R2 bucket named `job-flow` storing `resume.json`
 
 ## Development
 
 ```bash
-npm install
-wrangler r2 bucket create job-flow
-wrangler secret put ANTHROPIC_API_KEY
-wrangler secret put API_TOKEN
-npm run dev           # local dev at http://localhost:8787
-npm run deploy        # deploy to Cloudflare
+bun install
+cp .env.local.example .env.local
+bun run dev           # local dev at http://localhost:8787
+bun run deploy        # deploy to Cloudflare
 ```
 
 ## Design Decisions

@@ -1,45 +1,37 @@
 # job-flow
 
-AI-powered job application workflow. Paste a job URL or text, get a customized resume back.
+AI-powered job application workflow. Provide a job URL or pasted text, get a tailored JSON Resume back.
 
 ## Stack
 
-- **Runtime**: Cloudflare Workers
+- **Runtime**: Cloudflare Workers (provisioned with Alchemy)
 - **Framework**: Hono
 - **LLM**: Claude Sonnet (via Anthropic API)
 - **Storage**: R2 (resume + future job outputs)
 - **Job Fetching**: Jina Reader API
 
-## Setup
+## Quick Start
 
 ### 1. Install dependencies
 
 ```bash
-npm install
+bun install
 ```
 
-### 2. Create R2 bucket
+### 2. Create the R2 bucket
+
+Create an R2 bucket named `job-flow` in the Cloudflare dashboard. The Alchemy config adopts it.
+
+### 3. Set environment secrets
 
 ```bash
-wrangler r2 bucket create job-flow
-```
-
-### 3. Set secrets
-
-```bash
-wrangler secret put ANTHROPIC_API_KEY
-# paste your Anthropic API key
-
-wrangler secret put API_TOKEN
-# create a random token for authenticating requests
-# e.g.: openssl rand -hex 32
+cp .env.local.example .env.local
+# edit .env.local with your secrets
 ```
 
 ### 4. Upload your resume
 
-First, create your `resume.json` following the [JSON Resume schema](https://jsonresume.org/schema/). See `sample-resume.json` for an example.
-
-Then upload it:
+Create `resume.json` following the [JSON Resume schema](https://jsonresume.org/schema/). See `sample-resume.json` for an example.
 
 ```bash
 # Local dev
@@ -58,8 +50,10 @@ curl -X PUT https://job-flow.YOUR_SUBDOMAIN.workers.dev/resume \
 ### 5. Deploy
 
 ```bash
-npm run deploy
+bun run deploy
 ```
+
+Need more detail? See `DEPLOYMENT.md`.
 
 ## Usage
 
@@ -90,8 +84,12 @@ curl -X POST https://job-flow.YOUR_SUBDOMAIN.workers.dev/customize \
     "responsibilities": ["Build features", "Code review"],
     "techStack": ["TypeScript", "React", "Node.js"]
   },
-  "original": { /* your original resume */ },
-  "customized": { /* modified resume */ },
+  "original": {
+    "...": "your original resume"
+  },
+  "customized": {
+    "...": "modified resume"
+  },
   "changes": [
     {
       "section": "basics.summary",
@@ -122,13 +120,11 @@ curl -X PUT https://job-flow.YOUR_SUBDOMAIN.workers.dev/resume \
 ## Local Development
 
 ```bash
-npm run dev
+bun run dev
 # Worker runs at http://localhost:8787
 ```
 
-For local dev, you'll need to either:
-- Have R2 configured (wrangler handles this)
-- Or modify the code to use a local file for the resume
+Local development loads secrets from `.env.local`.
 
 ## Future Ideas
 
