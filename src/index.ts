@@ -15,11 +15,8 @@ import type {
 
 const app = new Hono<{ Bindings: Env }>();
 
-// CORS for web form access
 app.use("*", cors());
-
-// Auth middleware - all routes require bearer token (skip OPTIONS for CORS preflight)
-app.use("*", (c, next) => {
+app.use("/api/*", (c, next) => {
   if (c.req.method === "OPTIONS") {
     return next();
   }
@@ -28,11 +25,15 @@ app.use("*", (c, next) => {
 
 // Health check
 app.get("/", (c) => {
-  return c.json({ status: "ok", service: "job-flow" });
+  return c.json({
+    status: "ok",
+    service: "job-flow",
+    time: new Date().toISOString(),
+  });
 });
 
 // Main customization endpoint
-app.post("/customize", async (c) => {
+app.post("/api/customize", async (c) => {
   const parsedBody = await parseJsonBody<CustomizeRequest>(c);
   if (!parsedBody.ok) {
     return parsedBody.response;
@@ -124,7 +125,7 @@ app.post("/customize", async (c) => {
 });
 
 // Upload/update master resume
-app.put("/resume", async (c) => {
+app.put("/api/resume", async (c) => {
   const parsedBody = await parseJsonBody<JSONResume>(c);
   if (!parsedBody.ok) {
     return parsedBody.response;
@@ -151,7 +152,7 @@ app.put("/resume", async (c) => {
 });
 
 // Get current master resume
-app.get("/resume", async (c) => {
+app.get("/api/resume", async (c) => {
   const resumeResult = await getResume(c.env.BUCKET);
   if (!resumeResult.ok) {
     if (resumeResult.reason === "corrupt") {

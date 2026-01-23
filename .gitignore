@@ -15,6 +15,7 @@ _.seed
 .env.production.local
 .env.test.local
 .env*
+!.env.local.example
 .eslintcache
 .fusebox/
 .grunt
@@ -55,3 +56,5 @@ _.seed
 .DS_Store
 archived/
 .wrangler/
+.alchemy/
+node_modules/

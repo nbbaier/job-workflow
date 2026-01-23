@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 Instructions for AI coding agents working with this codebase.
 
@@ -22,7 +22,7 @@ src/
 ├── prompt.ts   # System prompt and user prompt builder for Claude
 └── types.ts    # TypeScript types (JSONResume, ParsedJob, API contracts)
 
-wrangler.toml   # Cloudflare Workers config with R2 binding
+alchemy.run.ts  # Alchemy infrastructure config for Cloudflare Workers + R2
 ```
 
 ## Core Flow
@@ -35,24 +35,25 @@ wrangler.toml   # Cloudflare Workers config with R2 binding
 
 ## Environment & Secrets
 
-Set via `wrangler secret put`:
+Set via environment variables (see `.env.local.example`):
 
+- `ALCHEMY_PASSWORD` - encrypts `.alchemy/` state
+- `CLOUDFLARE_API_TOKEN` - Cloudflare API token
+- `CLOUDFLARE_ACCOUNT_ID` - Cloudflare account ID
 - `ANTHROPIC_API_KEY` - Anthropic API key
-- `API_TOKEN` - Bearer token for authenticating requests to this worker
+- `API_TOKEN` - Bearer token for authenticating requests
 
-R2 bucket binding in `wrangler.toml`:
+R2 bucket binding is configured in `alchemy.run.ts`:
 
 - `BUCKET` - R2 bucket named `job-flow` storing `resume.json`
 
 ## Development
 
 ```bash
-npm install
-wrangler r2 bucket create job-flow
-wrangler secret put ANTHROPIC_API_KEY
-wrangler secret put API_TOKEN
-npm run dev           # local dev at http://localhost:8787
-npm run deploy        # deploy to Cloudflare
+bun install
+cp .env.local.example .env.local
+bun run dev           # local dev at http://localhost:8787
+bun run deploy        # deploy to Cloudflare
 ```
 
 ## Design Decisions
@@ -221,7 +222,6 @@ bun --hot ./index.ts
 
 For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
 
-
 # Ultracite Code Standards
 
 This project uses **Ultracite**, a zero-config preset that enforces strict code quality standards through automated formatting and linting.
@@ -273,11 +273,11 @@ Write code that is **accessible, performant, type-safe, and maintainable**. Focu
 - Nest children between opening and closing tags instead of passing as props
 - Don't define components inside other components
 - Use semantic HTML and ARIA attributes for accessibility:
-  - Provide meaningful alt text for images
-  - Use proper heading hierarchy
-  - Add labels for form inputs
-  - Include keyboard event handlers alongside mouse events
-  - Use semantic elements (`<button>`, `<nav>`, etc.) instead of divs with roles
+   - Provide meaningful alt text for images
+   - Use proper heading hierarchy
+   - Add labels for form inputs
+   - Include keyboard event handlers alongside mouse events
+   - Use semantic elements (`<button>`, `<nav>`, etc.) instead of divs with roles
 
 ### Error Handling & Debugging
 
@@ -312,14 +312,17 @@ Write code that is **accessible, performant, type-safe, and maintainable**. Focu
 ### Framework-Specific Guidance
 
 **Next.js:**
+
 - Use Next.js `<Image>` component for images
 - Use `next/head` or App Router metadata API for head elements
 - Use Server Components for async data fetching instead of async Client Components
 
 **React 19+:**
+
 - Use ref as a prop instead of `React.forwardRef`
 
 **Solid/Svelte/Vue/Qwik:**
+
 - Use `class` and `for` attributes (not `className` or `htmlFor`)
 
 ---
