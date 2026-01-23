@@ -21,7 +21,7 @@ app.use("*", cors());
 // Auth middleware - all routes require bearer token
 app.use("*", async (c, next) => {
   const auth = bearerAuth({ token: c.env.API_TOKEN });
-  return await auth(c, next);
+  await auth(c, next);
 });
 
 // Health check
