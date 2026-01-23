@@ -29,19 +29,29 @@ cp .env.local.example .env.local
 # edit .env.local with your secrets
 ```
 
+Required values:
+
+| Variable                | Description                              |
+| ----------------------- | ---------------------------------------- |
+| `ALCHEMY_PASSWORD`      | Encrypts the `.alchemy/` state           |
+| `CLOUDFLARE_API_TOKEN`  | Cloudflare API token for deployments     |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID                    |
+| `ANTHROPIC_API_KEY`     | Your Anthropic API key for Claude        |
+| `API_TOKEN`             | Bearer token for authenticating requests |
+
 ### 4. Upload your resume
 
 Create `resume.json` following the [JSON Resume schema](https://jsonresume.org/schema/). See `sample-resume.json` for an example.
 
 ```bash
 # Local dev
-curl -X PUT http://localhost:8787/resume \
+curl -X PUT http://localhost:8787/api/resume \
   -H "Authorization: Bearer YOUR_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d @resume.json
 
 # Production
-curl -X PUT https://job-flow.YOUR_SUBDOMAIN.workers.dev/resume \
+curl -X PUT https://job-flow.YOUR_SUBDOMAIN.workers.dev/api/resume \
   -H "Authorization: Bearer YOUR_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d @resume.json
@@ -53,7 +63,7 @@ curl -X PUT https://job-flow.YOUR_SUBDOMAIN.workers.dev/resume \
 bun run deploy
 ```
 
-Need more detail? See `DEPLOYMENT.md`.
+This will build and deploy the worker, then output your worker URL (e.g., `https://job-flow.YOUR_SUBDOMAIN.workers.dev`).
 
 ## Usage
 
@@ -61,13 +71,13 @@ Need more detail? See `DEPLOYMENT.md`.
 
 ```bash
 # With a URL (uses Jina Reader to extract content)
-curl -X POST https://job-flow.YOUR_SUBDOMAIN.workers.dev/customize \
+curl -X POST https://job-flow.YOUR_SUBDOMAIN.workers.dev/api/customize \
   -H "Authorization: Bearer YOUR_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"input": "https://boards.greenhouse.io/company/jobs/12345"}'
 
 # With pasted job text
-curl -X POST https://job-flow.YOUR_SUBDOMAIN.workers.dev/customize \
+curl -X POST https://job-flow.YOUR_SUBDOMAIN.workers.dev/api/customize \
   -H "Authorization: Bearer YOUR_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"input": "Software Engineer at Acme Corp\n\nWe are looking for..."}'
@@ -77,29 +87,29 @@ curl -X POST https://job-flow.YOUR_SUBDOMAIN.workers.dev/customize \
 
 ```json
 {
-  "job": {
-    "title": "Software Engineer",
-    "company": "Acme Corp",
-    "requirements": ["3+ years experience", "TypeScript"],
-    "responsibilities": ["Build features", "Code review"],
-    "techStack": ["TypeScript", "React", "Node.js"]
-  },
-  "original": {
-    "...": "your original resume"
-  },
-  "customized": {
-    "...": "modified resume"
-  },
-  "changes": [
-    {
-      "section": "basics.summary",
-      "field": "summary",
-      "before": "Full stack developer...",
-      "after": "Full stack developer with expertise in TypeScript...",
-      "rationale": "Added emphasis on TypeScript to match job requirements"
-    }
-  ],
-  "reasoning": "The role emphasizes TypeScript and React experience..."
+   "job": {
+      "title": "Software Engineer",
+      "company": "Acme Corp",
+      "requirements": ["3+ years experience", "TypeScript"],
+      "responsibilities": ["Build features", "Code review"],
+      "techStack": ["TypeScript", "React", "Node.js"]
+   },
+   "original": {
+      "...": "your original resume"
+   },
+   "customized": {
+      "...": "modified resume"
+   },
+   "changes": [
+      {
+         "section": "basics.summary",
+         "field": "summary",
+         "before": "Full stack developer...",
+         "after": "Full stack developer with expertise in TypeScript...",
+         "rationale": "Added emphasis on TypeScript to match job requirements"
+      }
+   ],
+   "reasoning": "The role emphasizes TypeScript and React experience..."
 }
 ```
 
@@ -107,24 +117,77 @@ curl -X POST https://job-flow.YOUR_SUBDOMAIN.workers.dev/customize \
 
 ```bash
 # Get current resume
-curl https://job-flow.YOUR_SUBDOMAIN.workers.dev/resume \
+curl https://job-flow.YOUR_SUBDOMAIN.workers.dev/api/resume \
   -H "Authorization: Bearer YOUR_API_TOKEN"
 
 # Update resume
-curl -X PUT https://job-flow.YOUR_SUBDOMAIN.workers.dev/resume \
+curl -X PUT https://job-flow.YOUR_SUBDOMAIN.workers.dev/api/resume \
   -H "Authorization: Bearer YOUR_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d @resume.json
 ```
 
+### Health check
+
+```bash
+curl https://job-flow.YOUR_SUBDOMAIN.workers.dev/
+```
+
+The health check endpoint does not require authentication.
+
 ## Local Development
 
 ```bash
 bun run dev
-# Worker runs at http://localhost:8787
+# Worker runs at http://localhost:1337
 ```
 
 Local development loads secrets from `.env.local`.
+
+## Troubleshooting
+
+### "Master resume not found in R2"
+
+Upload your resume first using the PUT /api/resume endpoint.
+
+### "Authentication error"
+
+Verify your `API_TOKEN` in `.env.local` matches what your client is sending in the `Authorization: Bearer` header.
+
+### "Anthropic API error"
+
+Verify `ANTHROPIC_API_KEY` is set correctly.
+
+### Local development not working
+
+Confirm `.env.local` exists and contains all required variables.
+
+### Deployment fails
+
+- Confirm `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are valid
+- Verify the R2 bucket exists in your account
+- Check for TypeScript errors: `bunx tsc --noEmit`
+
+## CI/CD Deployment
+
+For automated deployment, set the same secrets used in `.env.local` as CI environment variables, then run:
+
+```bash
+bun run deploy
+```
+
+## Cost Estimates
+
+With Cloudflare's free tier:
+
+- **Workers**: 100,000 requests/day free
+- **R2 Storage**: 10GB free
+- **R2 Operations**: Class A (1M/mo free), Class B (10M/mo free)
+
+Anthropic API costs:
+
+- **Claude Sonnet 4.5**: ~$3 per 1M input tokens, ~$15 per 1M output tokens
+- Typical resume customization: ~2K input + ~4K output = ~$0.08 per job
 
 ## Future Ideas
 

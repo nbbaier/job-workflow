@@ -77,7 +77,7 @@ app.post("/api/customize", async (c) => {
   let message: Anthropic.Message;
   try {
     message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-5",
       max_tokens: 8192,
       messages: [
         {
