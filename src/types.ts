@@ -1,9 +1,7 @@
-// Cloudflare bindings
-export interface Env {
-  BUCKET: R2Bucket;
-  ANTHROPIC_API_KEY: string;
-  API_TOKEN: string;
-}
+// Cloudflare bindings - inferred from alchemy.run.ts
+import type { worker } from "../alchemy.run";
+
+export type Env = typeof worker.Env;
 
 // JSON Resume schema (simplified - extend as needed)
 // Full spec: https://jsonresume.org/schema/
