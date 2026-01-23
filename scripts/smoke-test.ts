@@ -1,4 +1,4 @@
-const baseUrl = process.env.BASE_URL ?? "http://localhost:8787";
+const baseUrl = process.env.BASE_URL ?? "http://localhost:1337";
 const token = process.env.API_TOKEN;
 
 if (!token) {

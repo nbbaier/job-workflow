@@ -18,7 +18,7 @@ No database. No multi-agent orchestration framework. Just a single API endpoint 
 
 ```
 src/
-├── index.ts    # Hono app with routes: GET /, POST /customize, GET/PUT /resume
+├── index.ts    # Hono app with routes: GET /, POST /api/customize, GET/PUT /api/resume
 ├── prompt.ts   # System prompt and user prompt builder for Claude
 └── types.ts    # TypeScript types (JSONResume, ParsedJob, API contracts)
 
@@ -27,7 +27,7 @@ alchemy.run.ts  # Alchemy infrastructure config for Cloudflare Workers + R2
 
 ## Core Flow
 
-1. `POST /customize` receives `{ input: string }` (URL or pasted job text)
+1. `POST /api/customize` receives `{ input: string }` (URL or pasted job text)
 2. If input is a URL, fetch via Jina Reader (`https://r.jina.ai/{url}`)
 3. Load master `resume.json` from R2
 4. Call Claude with job text + resume → get customized resume + changes + reasoning
