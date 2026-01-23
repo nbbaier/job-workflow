@@ -86,13 +86,13 @@ The server will start at http://localhost:8787 and load secrets from `.env.local
 
 These are configured via Cloudflare:
 
-| Variable            | Type       | Description                                              |
-| ------------------- | ---------- | -------------------------------------------------------- |
-| `ALCHEMY_PASSWORD`    | Secret     | Encrypts the `.alchemy/` state                           |
-| `CLOUDFLARE_API_TOKEN`| Secret     | Cloudflare API token for deployments                     |
-| `CLOUDFLARE_ACCOUNT_ID` | Secret   | Cloudflare account ID                                    |
-| `ANTHROPIC_API_KEY`   | Secret     | Your Anthropic API key for Claude                        |
-| `API_TOKEN`           | Secret     | Bearer token for authenticating requests                 |
+| Variable                | Type   | Description                              |
+| ----------------------- | ------ | ---------------------------------------- |
+| `ALCHEMY_PASSWORD`      | Secret | Encrypts the `.alchemy/` state           |
+| `CLOUDFLARE_API_TOKEN`  | Secret | Cloudflare API token for deployments     |
+| `CLOUDFLARE_ACCOUNT_ID` | Secret | Cloudflare account ID                    |
+| `ANTHROPIC_API_KEY`     | Secret | Your Anthropic API key for Claude        |
+| `API_TOKEN`             | Secret | Bearer token for authenticating requests |
 
 ## Troubleshooting
 
