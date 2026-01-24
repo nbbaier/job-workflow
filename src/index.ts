@@ -23,13 +23,10 @@ app.use("/api/*", (c, next) => {
   return bearerAuth({ token: c.env.API_TOKEN })(c, next);
 });
 
-// Health check
-app.get("/", (c) => {
-  return c.json({
-    status: "ok",
-    service: "job-flow",
-    time: new Date().toISOString(),
-  });
+// Serve HTML frontend
+app.get("/", async (c) => {
+  const htmlContent = await Bun.file("index.html").text();
+  return c.html(htmlContent);
 });
 
 // Main customization endpoint

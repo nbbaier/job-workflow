@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Resume Customizer</title>
+    <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+        Cantarell, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      padding: 40px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      color: #667eea;
+      margin-bottom: 10px;
+      font-size: 2.5rem;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 1.1rem;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #444;
+    }
+
+    input[type="password"],
+    textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+      font-family: inherit;
+      transition: border-color 0.3s;
+    }
+
+    input[type="password"]:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    textarea {
+      min-height: 150px;
+      resize: vertical;
+    }
+
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 14px 32px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition:
+        transform 0.2s,
+        box-shadow 0.2s;
+      width: 100%;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .help-text {
+      font-size: 0.9rem;
+      color: #666;
+      margin-top: 5px;
+    }
+
+    .result {
+      display: none;
+      margin-top: 30px;
+    }
+
+    .result.show {
+      display: block;
+    }
+
+    .result-section {
+      margin-bottom: 25px;
+    }
+
+    .result-section h3 {
+      color: #667eea;
+      margin-bottom: 10px;
+      font-size: 1.3rem;
+    }
+
+    .result-content {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      border-left: 4px solid #667eea;
+    }
+
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-family: "Courier New", monospace;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .error {
+      background: #fee;
+      border-left-color: #f44;
+      color: #c00;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 20px;
+    }
+
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    .changes-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .changes-list li {
+      padding: 8px 0;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .changes-list li:last-child {
+      border-bottom: none;
+    }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="card">
+        <h1>Job Resume Customizer</h1>
+        <p class="subtitle">
+          Submit a job posting URL or paste the job description to get a
+          customized resume.
+        </p>
+
+        <form id="customizeForm">
+          <div class="form-group">
+            <label for="apiToken">API Token</label>
+            <input
+              type="password"
+              id="apiToken"
+              name="apiToken"
+              placeholder="Enter your API token"
+              required
+            >
+            <p class="help-text">
+              Your API token is stored locally and never sent to external
+              servers.
+            </p>
+          </div>
+
+          <div class="form-group">
+            <label for="jobInput">Job Posting URL or Text</label>
+            <textarea
+              id="jobInput"
+              name="jobInput"
+              placeholder="Enter a job posting URL (https://...) or paste the job description here"
+              required
+            ></textarea>
+            <p class="help-text">
+              Paste a URL to fetch the job posting automatically, or paste the
+              job description text directly.
+            </p>
+          </div>
+
+          <button type="submit" id="submitBtn">Customize Resume</button>
+        </form>
+
+        <div id="loading" class="loading" style="display: none;">
+          <div class="spinner"></div>
+          <p>Processing your request...</p>
+        </div>
+      </div>
+
+      <div id="result" class="result">
+        <div class="card">
+          <h2>Results</h2>
+
+          <div class="result-section">
+            <h3>Job Information</h3>
+            <div id="jobInfo" class="result-content"></div>
+          </div>
+
+          <div class="result-section">
+            <h3>Reasoning</h3>
+            <div id="reasoning" class="result-content"></div>
+          </div>
+
+          <div class="result-section">
+            <h3>Changes Made</h3>
+            <div id="changes" class="result-content"></div>
+          </div>
+
+          <div class="result-section">
+            <h3>Customized Resume</h3>
+            <div id="customizedResume" class="result-content"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    "use strict";
+    // Load API token from localStorage on page load
+    const apiTokenInput = document.getElementById("apiToken");
+    const savedToken = localStorage.getItem("apiToken");
+    if (savedToken) {
+      apiTokenInput.value = savedToken;
+    }
+
+    // Save API token to localStorage when it changes
+    apiTokenInput.addEventListener("change", (e) => {
+      localStorage.setItem("apiToken", e.target.value);
+    });
+
+    // Handle form submission
+    const form = document.getElementById("customizeForm");
+    const submitBtn = document.getElementById("submitBtn");
+    const loading = document.getElementById("loading");
+    const result = document.getElementById("result");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const apiToken = apiTokenInput.value.trim();
+      const jobInput = document.getElementById("jobInput").value.trim();
+
+      if (!(apiToken && jobInput)) {
+        alert("Please fill in all fields");
+        return;
+      }
+
+      // Save token
+      localStorage.setItem("apiToken", apiToken);
+
+      // Show loading, hide results
+      submitBtn.disabled = true;
+      loading.style.display = "block";
+      result.classList.remove("show");
+
+      try {
+        const response = await fetch("/api/customize", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiToken}`,
+          },
+          body: JSON.stringify({ input: jobInput }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error || `Request failed with status ${response.status}`
+          );
+        }
+
+        // Display results
+        displayResults(data);
+        result.classList.add("show");
+      } catch (error) {
+        displayError(error.message);
+        result.classList.add("show");
+      } finally {
+        submitBtn.disabled = false;
+        loading.style.display = "none";
+      }
+    });
+
+    function displayResults(data) {
+      // Job Information
+      const jobInfo = document.getElementById("jobInfo");
+      jobInfo.className = "result-content";
+      jobInfo.innerHTML = `
+                <p><strong>Company:</strong> ${escapeHtml(data.job.company)}</p>
+                <p><strong>Title:</strong> ${escapeHtml(data.job.title)}</p>
+                ${data.job.location ? `<p><strong>Location:</strong> ${escapeHtml(data.job.location)}</p>` : ""}
+            `;
+
+      // Reasoning
+      const reasoning = document.getElementById("reasoning");
+      reasoning.className = "result-content";
+      reasoning.innerHTML = `<pre>${escapeHtml(data.reasoning)}</pre>`;
+
+      // Changes
+      const changes = document.getElementById("changes");
+      changes.className = "result-content";
+      if (data.changes && data.changes.length > 0) {
+        const changesList = data.changes
+          .map((change) => `<li>${escapeHtml(change)}</li>`)
+          .join("");
+        changes.innerHTML = `<ul class="changes-list">${changesList}</ul>`;
+      } else {
+        changes.innerHTML = "<p>No changes made.</p>";
+      }
+
+      // Customized Resume
+      const customizedResume = document.getElementById("customizedResume");
+      customizedResume.className = "result-content";
+      customizedResume.innerHTML = `<pre>${escapeHtml(JSON.stringify(data.customized, null, 2))}</pre>`;
+    }
+
+    function displayError(message) {
+      const jobInfo = document.getElementById("jobInfo");
+      jobInfo.className = "result-content error";
+      jobInfo.innerHTML = `<p><strong>Error:</strong> ${escapeHtml(message)}</p>`;
+
+      document.getElementById("reasoning").innerHTML = "";
+      document.getElementById("changes").innerHTML = "";
+      document.getElementById("customizedResume").innerHTML = "";
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    </script>
+  </body>
+</html>
