@@ -8,7 +8,10 @@ const app = await alchemy("job-flow-app", {
   stateStore: (scope) => new CloudflareStateStore(scope),
 });
 
-const bucket = await R2Bucket("job-flow-storage", { adopt: true });
+const bucket = await R2Bucket("job-flow-storage", {
+  name: "job-flow-storage",
+  adopt: true,
+});
 
 export const worker = await Worker("job-flow", {
   entrypoint: "./src/index.ts",
