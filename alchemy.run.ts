@@ -4,7 +4,7 @@ import { GitHubComment } from "alchemy/github";
 import { CloudflareStateStore } from "alchemy/state";
 
 const app = await alchemy("job-flow-app", {
-  stage: process.env.STAGE ?? "production",
+  stage: process.env.STAGE ?? "dev",
   password: process.env.ALCHEMY_PASSWORD,
   stateStore: (scope) => new CloudflareStateStore(scope),
 });
@@ -15,10 +15,11 @@ const bucket = await R2Bucket("job-flow-storage", {
 });
 
 export const worker = await Worker("job-flow", {
-  name: "job-flow",
+  name: `job-flow${process.env.STAGE === "dev" ? "-dev" : ""}`,
   entrypoint: "./src/index.ts",
   url: true,
   compatibilityDate: "2026-01-24",
+  compatibilityFlags: ["nodejs_compat"],
   assets: {
     html_handling: "auto-trailing-slash",
     not_found_handling: "single-page-application",
@@ -31,14 +32,14 @@ export const worker = await Worker("job-flow", {
   },
 });
 
-console.log("Worker URL:", worker.url);
+console.log(`Worker URL: ${worker.url}`);
 
 if (process.env.PULL_REQUEST) {
   const previewUrl = worker.url;
 
   await GitHubComment("pr-preview-comment", {
-    owner: process.env.GITHUB_REPOSITORY_OWNER || "your-username",
-    repository: process.env.GITHUB_REPOSITORY_NAME || "password",
+    owner: process.env.GITHUB_REPOSITORY_OWNER || "nbbaier",
+    repository: process.env.GITHUB_REPOSITORY_NAME || "idea-explorer",
     issueNumber: Number(process.env.PULL_REQUEST),
     body: `
 ## 🚀 Preview Deployed
