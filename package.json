@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "alchemy dev --env-file .env.local",
-    "deploy": "alchemy deploy",
+    "deploy": "alchemy deploy --stage prod",
     "destroy": "alchemy destroy",
     "lint": "bunx ultracite check",
     "fix": "bunx ultracite fix",

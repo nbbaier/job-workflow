@@ -8,11 +8,13 @@ const app = await alchemy("job-flow-app", {
   stateStore: (scope) => new CloudflareStateStore(scope),
 });
 
-const bucket = await R2Bucket("job-flow-storage", {
-  name: "job-flow-storage",
+const bucket = await R2Bucket("job-flow-r2", {
+  name: "job-flow-r2",
+  adopt: true,
 });
 
 export const worker = await Worker("job-flow", {
+  name: `job-flow-${app.stage}`,
   entrypoint: "./src/index.ts",
   adopt: true,
   url: true,
@@ -31,6 +33,9 @@ export const worker = await Worker("job-flow", {
 });
 
 console.log(`Worker URL: ${worker.url}`);
+console.log(`Worker name: ${worker.name}`);
+console.log(`R2 Bucket: ${bucket.name}`);
+console.log(`App stage: ${app.stage}`);
 
 if (process.env.PULL_REQUEST) {
   const previewUrl = worker.url;
