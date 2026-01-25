@@ -23,16 +23,11 @@ app.use("/api/*", (c, next) => {
   return bearerAuth({ token: c.env.API_TOKEN })(c, next);
 });
 
-// Health check
-app.get("/", (c) => {
-  return c.json({
-    status: "ok",
-    service: "job-flow",
-    time: new Date().toISOString(),
-  });
+app.get("/", async (c) => {
+  const url = new URL(c.req.url);
+  return await c.env.ASSETS.fetch(new URL(url.origin));
 });
 
-// Main customization endpoint
 app.post("/api/customize", async (c) => {
   const parsedBody = await parseJsonBody<CustomizeRequest>(c);
   if (!parsedBody.ok) {
@@ -46,6 +41,7 @@ app.post("/api/customize", async (c) => {
   }
 
   const trimmedInput = input.trim();
+
   if (!trimmedInput) {
     return jsonError(c, 400, "Input cannot be empty");
   }
@@ -54,10 +50,8 @@ app.post("/api/customize", async (c) => {
     return jsonError(c, 413, "Input too large");
   }
 
-  // 1. Fetch job text (URL or raw text)
   const jobText = await getJobText(trimmedInput);
 
-  // 2. Load master resume from R2
   const resumeResult = await getResume(c.env.BUCKET);
   if (!resumeResult.ok) {
     if (resumeResult.reason === "corrupt") {
@@ -71,7 +65,6 @@ app.post("/api/customize", async (c) => {
   }
   const resume = resumeResult.resume;
 
-  // 3. Call Claude to customize
   const anthropic = new Anthropic({ apiKey: c.env.ANTHROPIC_API_KEY });
 
   let message: Anthropic.Message;
@@ -93,7 +86,6 @@ app.post("/api/customize", async (c) => {
     });
   }
 
-  // Extract text content from response
   const textBlock = message.content.find((block) => block.type === "text");
   if (!textBlock || textBlock.type !== "text") {
     return jsonError(c, 500, "No text response from Claude", {
@@ -101,7 +93,6 @@ app.post("/api/customize", async (c) => {
     });
   }
 
-  // 4. Parse the response
   let parsed: LLMResponse;
   try {
     parsed = parseResponse(textBlock.text);
@@ -112,7 +103,6 @@ app.post("/api/customize", async (c) => {
     });
   }
 
-  // 5. Build response
   const response: CustomizeResponse = {
     job: parsed.job,
     original: resume,
@@ -124,7 +114,6 @@ app.post("/api/customize", async (c) => {
   return c.json(response);
 });
 
-// Upload/update master resume
 app.put("/api/resume", async (c) => {
   const parsedBody = await parseJsonBody<JSONResume>(c);
   if (!parsedBody.ok) {
@@ -133,7 +122,6 @@ app.put("/api/resume", async (c) => {
 
   const resume = parsedBody.value;
 
-  // Basic validation
   if (!resume.basics?.name) {
     return jsonError(c, 400, "Invalid JSON Resume: missing basics.name");
   }
@@ -151,7 +139,6 @@ app.put("/api/resume", async (c) => {
   return c.json({ status: "ok", message: "Resume uploaded" });
 });
 
-// Get current master resume
 app.get("/api/resume", async (c) => {
   const resumeResult = await getResume(c.env.BUCKET);
   if (!resumeResult.ok) {
@@ -163,43 +150,32 @@ app.get("/api/resume", async (c) => {
   return c.json(resumeResult.resume);
 });
 
-// ─────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────
-
 async function getJobText(input: string): Promise<string> {
   const trimmed = input.trim();
 
-  // Check if it looks like a URL
   if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
     try {
-      // Use Jina Reader API for clean extraction
       const jinaUrl = `https://r.jina.ai/${trimmed}`;
       const response = await fetch(jinaUrl, {
         headers: {
-          // Jina respects Accept header for format
           Accept: "text/plain",
         },
       });
 
       if (response.ok) {
         const text = await response.text();
-        // Jina returns markdown - that's fine for our purposes
         if (text && text.length > 100) {
           return text;
         }
       }
-      // If Jina fails or returns too little, fall through
       console.log(
         "Jina fetch failed or returned insufficient content, using raw input"
       );
     } catch (e) {
       console.log("Jina fetch error:", e);
-      // Fall through to return raw input
     }
   }
 
-  // Not a URL, or URL fetch failed - treat as raw job text
   return trimmed;
 }
 
