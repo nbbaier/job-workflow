@@ -40,6 +40,7 @@ jobs:
               CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
               ALCHEMY_PASSWORD: ${{ secrets.ALCHEMY_PASSWORD }}
               ALCHEMY_STATE_TOKEN: ${{ secrets.ALCHEMY_STATE_TOKEN }}
+              ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
    cleanup-preview:
       if: ${{ github.event.action == 'closed' }}
       runs-on: ubuntu-latest
