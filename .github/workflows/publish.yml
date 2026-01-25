@@ -32,3 +32,4 @@ jobs:
               ALCHEMY_PASSWORD: ${{ secrets.ALCHEMY_PASSWORD }}
               ALCHEMY_STATE_TOKEN: ${{ secrets.ALCHEMY_STATE_TOKEN }}
               ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+              API_TOKEN: ${{ secrets.API_TOKEN }}
