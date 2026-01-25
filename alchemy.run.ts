@@ -4,18 +4,13 @@ import { GitHubComment } from "alchemy/github";
 import { CloudflareStateStore } from "alchemy/state";
 
 const app = await alchemy("job-flow-app", {
-  stage: process.env.STAGE ?? "dev",
   password: process.env.ALCHEMY_PASSWORD,
   stateStore: (scope) => new CloudflareStateStore(scope),
 });
 
-const bucket = await R2Bucket("job-flow-storage", {
-  name: "job-flow-storage",
-  adopt: true,
-});
+const bucket = await R2Bucket("job-flow-storage", { adopt: true });
 
 export const worker = await Worker("job-flow", {
-  name: `job-flow${process.env.STAGE === "dev" ? "-dev" : ""}`,
   entrypoint: "./src/index.ts",
   adopt: true,
   url: true,
