@@ -17,6 +17,7 @@ const bucket = await R2Bucket("job-flow-storage", {
 export const worker = await Worker("job-flow", {
   name: `job-flow${process.env.STAGE === "dev" ? "-dev" : ""}`,
   entrypoint: "./src/index.ts",
+  adopt: true,
   url: true,
   compatibilityDate: "2026-01-24",
   compatibilityFlags: ["nodejs_compat"],
