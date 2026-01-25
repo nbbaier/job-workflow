@@ -1,5 +1,6 @@
 import alchemy from "alchemy";
-import { R2Bucket, Worker } from "alchemy/cloudflare";
+import { Assets, R2Bucket, Worker } from "alchemy/cloudflare";
+import { GitHubComment } from "alchemy/github";
 import { CloudflareStateStore } from "alchemy/state";
 
 const app = await alchemy("job-flow-app", {
@@ -17,8 +18,13 @@ export const worker = await Worker("job-flow", {
   name: "job-flow",
   entrypoint: "./src/index.ts",
   url: true,
-  compatibilityDate: "2024-01-01",
+  compatibilityDate: "2026-01-24",
+  assets: {
+    html_handling: "auto-trailing-slash",
+    not_found_handling: "single-page-application",
+  },
   bindings: {
+    ASSETS: await Assets({ path: "./public" }),
     BUCKET: bucket,
     ANTHROPIC_API_KEY: alchemy.secret(process.env.ANTHROPIC_API_KEY),
     API_TOKEN: alchemy.secret(process.env.API_TOKEN),
@@ -26,5 +32,26 @@ export const worker = await Worker("job-flow", {
 });
 
 console.log("Worker URL:", worker.url);
+
+if (process.env.PULL_REQUEST) {
+  const previewUrl = worker.url;
+
+  await GitHubComment("pr-preview-comment", {
+    owner: process.env.GITHUB_REPOSITORY_OWNER || "your-username",
+    repository: process.env.GITHUB_REPOSITORY_NAME || "password",
+    issueNumber: Number(process.env.PULL_REQUEST),
+    body: `
+## 🚀 Preview Deployed
+
+Your preview is ready!
+
+**Preview URL:** ${previewUrl}
+
+This preview was built from commit ${process.env.GITHUB_SHA}
+
+---
+<sub>🤖 This comment will be updated automatically when you push new commits to this PR.</sub>`,
+  });
+}
 
 await app.finalize();
