@@ -1,5 +1,5 @@
 import alchemy from "alchemy";
-import { Assets, R2Bucket, Worker } from "alchemy/cloudflare";
+import { Assets, KVNamespace, R2Bucket, Worker } from "alchemy/cloudflare";
 import { GitHubComment } from "alchemy/github";
 import { CloudflareStateStore } from "alchemy/state";
 
@@ -7,6 +7,8 @@ const app = await alchemy("job-flow-app", {
   password: process.env.ALCHEMY_PASSWORD,
   stateStore: (scope) => new CloudflareStateStore(scope),
 });
+
+const kv = await KVNamespace("job-flow-kv", { adopt: true });
 
 const bucket = await R2Bucket("job-flow-r2", {
   name: "job-flow-r2",
@@ -25,6 +27,7 @@ export const worker = await Worker("job-flow", {
     not_found_handling: "single-page-application",
   },
   bindings: {
+    KV: kv,
     ASSETS: await Assets({ path: "./public" }),
     BUCKET: bucket,
     ANTHROPIC_API_KEY: alchemy.secret(process.env.ANTHROPIC_API_KEY),
