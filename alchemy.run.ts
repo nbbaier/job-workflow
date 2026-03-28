@@ -6,17 +6,14 @@ import { CloudflareStateStore } from "alchemy/state";
 const app = await alchemy("job-flow-app", {
   password: process.env.ALCHEMY_PASSWORD,
   stateStore: (scope) => new CloudflareStateStore(scope),
-});
-
-const bucket = await R2Bucket("job-flow-r2", {
-  name: "job-flow-r2",
   adopt: true,
 });
+
+const bucket = await R2Bucket("job-flow-r2", { name: "job-flow-r2" });
 
 export const worker = await Worker("job-flow", {
   name: `job-flow-${app.stage}`,
   entrypoint: "./src/index.ts",
-  adopt: true,
   url: true,
   compatibilityDate: "2026-01-24",
   compatibilityFlags: ["nodejs_compat"],
